@@ -63,14 +63,24 @@ value="0"><small class="hint">Если не знаешь, оставь 0. Точ
       const result = await response.json();
 
       if (!response.ok || !result.ok) {
-        if (result.error === 'Telegram could not send the message. Open the bot and press Start first.') {
-          throw new Error('Сначала открой своего бота в Telegram и нажми «Старт», затем вернись сюда.');
-        }
-        if (result.error === 'Telegram verification failed' ||
-            result.error === 'Invalid or expired Telegram session') {
-          throw new Error('Сеанс Telegram устарел. Закрой калькулятор, открой его заново через бота и повтори.');
-        }
-        throw new Error('Не удалось отправить результат. Попробуй открыть калькулятор заново через бота.');
+        const messages = {
+          INIT_DATA_MISSING: 'Telegram не передал данные авторизации. Закрой мини-приложение и открой его кнопкой в боте.',
+          INIT_DATA_TOO_LARGE: 'Получены некорректные данные Telegram. Перезапусти мини-приложение.',
+          INIT_DATA_INCOMPLETE: 'В данных Telegram не хватает полей авторизации. Открой мини-приложение заново через бота.',
+          AUTH_DATE_INVALID: 'Telegram передал некорректное время авторизации. Открой мини-приложение заново через бота.',
+          AUTH_DATE_IN_FUTURE: 'Время авторизации Telegram некорректно. Перезапусти мини-приложение.',
+          AUTH_DATE_EXPIRED: 'Сессия старше 24 часов. Закрой мини-приложение и открой его заново через бота.',
+          USER_INVALID: 'Не удалось прочитать профиль Telegram. Открой мини-приложение через бота.',
+          USER_ID_MISSING: 'Telegram не передал ID пользователя. Открой мини-приложение через бота.',
+          SIGNATURE_INVALID: 'Проверка подписи Telegram не прошла. Проверь токен и код Worker в Cloudflare.',
+          BOT_START_REQUIRED: 'Сначала открой своего бота в Telegram и нажми «Старт», затем повтори отправку.',
+          TELEGRAM_SEND_FAILED: 'Telegram не смог отправить сообщение. Проверь, что ты нажал «Старт» у бота.',
+          TELEGRAM_NETWORK_ERROR: 'Не удалось связаться с Telegram. Попробуй ещё раз позже.',
+          BOT_TOKEN_MISSING: 'В Cloudflare не настроен секрет TELEGRAM_BOT_TOKEN.',
+          ORIGIN_NOT_ALLOWED: 'Адрес сайта не разрешён в настройках Worker.',
+          RESULT_INVALID: 'Данные расчёта некорректны. Пересчитай результат и попробуй снова.'
+        };
+        throw new Error(messages[result.code] || 'Не удалось отправить результат. Проверь настройки Worker в Cloudflare и попробуй ещё раз.');
       }
 
       status.textContent = 'Готово! Результат отправлен тебе в личные сообщения бота.';
