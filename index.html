@@ -34,6 +34,51 @@ value="0"><small class="hint">Если не знаешь, оставь 0. Точ
 (()=>{
  const tg=window.Telegram?.WebApp; if(tg){tg.ready();tg.expand();try{tg.setHeaderColor('#f4f2ee');tg.setBackgroundColor('#f4f2ee');}catch(e){}}
  const $=id=>document.getElementById(id);const panels=[...document.querySelectorAll('.panel')],pills=[...document.querySelectorAll('.step-pill')];let step=0,sex='m',delay=0,age=36;
+  $('results').addEventListener('click', async event => {
+    const button = event.target.closest('#sendTelegram');
+    if (!button) return;
+
+    const status = $('telegramStatus');
+    if (!tg || !tg.initData) {
+      status.textContent = 'Открой калькулятор через Telegram-бота, затем повтори отправку.';
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = 'Отправляем результат…';
+
+    try {
+      const response = await fetch('https://pension-bot-api.zrw4813.workers.dev/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          initData: tg.initData,
+          amount: Number(button.dataset.amount),
+          ipk: Number(button.dataset.ipk),
+          serviceYears: Number(button.dataset.serviceYears)
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        if (result.error === 'Telegram could not send the message. Open the bot and press Start first.') {
+          throw new Error('Сначала открой своего бота в Telegram и нажми «Старт», затем вернись сюда.');
+        }
+        if (result.error === 'Telegram verification failed' ||
+            result.error === 'Invalid or expired Telegram session') {
+          throw new Error('Сеанс Telegram устарел. Закрой калькулятор, открой его заново через бота и повтори.');
+        }
+        throw new Error('Не удалось отправить результат. Попробуй открыть калькулятор заново через бота.');
+      }
+
+      status.textContent = 'Готово! Результат отправлен тебе в личные сообщения бота.';
+    } catch (error) {
+      status.textContent = error.message || 'Ошибка отправки. Попробуй ещё раз.';
+    } finally {
+      button.disabled = false;
+    }
+  });
  const money=n=>Math.round(n).toLocaleString('ru-RU')+' ₽';const dec=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});const num=id=>Math.max(0,Number($(id).value)||0);
  function renderStep(n){step=Math.max(0,Math.min(5,n));panels.forEach((p,i)=>p.classList.toggle('active',i===step));pills.forEach((p,i)=>p.classList.toggle('active',i===step));$('back').disabled=step===0;$('next').textContent=step===5?'Пересчитать ↻':step===4?'Показать результат ›':'Дальше ›';pills[step].scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});if(step===5)calculate();window.scrollTo({top:0,behavior:'smooth'});}
  pills.forEach(b=>b.addEventListener('click',()=>renderStep(Number(b.dataset.step))));$('back').addEventListener('click',()=>renderStep(step-1));$('next').addEventListener('click',()=>{if(step===5){calculate();return}renderStep(step+1)});
@@ -69,7 +114,7 @@ if(missingIPK===0&&missingService===0){
   });
 }
                       const retirement=sex==='m'?65:60;const annualRows=annual.slice(0,5).map(x=>`<tr><td>${x.year}</td><td>${money(x.salary)}/мес.</td><td>${dec(x.points)}</td></tr>`).join('');const maxSalary=money(cap/12);$('results').innerHTML=`<div class="result-hero"><div class="eyebrow">Предполагаемая страховая пенсия</div><div class="money">${money(raw+supplement)}<span style="font-size:18px;letter-spacing:0"> / мес.</span></div><p>В условных ценах 2026 года. ${delay?`Учтён сценарий отсрочки на ${delay} ${delay===1?'год':'лет'} с коэффициентом ×${String(factor).replace('.',',')}.`:'Без коэффициента отсрочки.'}
-</p></div>${requirementNotice ? `<div class="notice">${requirementNotice}</div>` : ''}<div class="metrics">
+</p></div><button type="button" class="nav-btn primary" id="sendTelegram" data-amount="${raw+supplement}" data-ipk="${total}" data-service-years="${years}" style="width:100%;margin:0 0 8px">Отправить результат в Telegram</button><p id="telegramStatus" class="hint" role="status" aria-live="polite" style="margin:0 0 18px"></p>${requirementNotice ? `<div class="notice">${requirementNotice}</div>` : ''}<div class="metrics">
 <div class="metric"><div class="label">ИПК за первый год</div><div class="value">${dec(Math.min(10,salary*12/cap*10))}</div></div><div class="metric"><div class="label">ИПК к пенсии по модели</div><div class="value">${dec(total)}</div></div><div class="metric"><div class="label">Страховая пенсия без доплат</div><div class="value">${money(raw)}</div></div><div class="metric"><div class="label">Условная региональная доплата</div><div class="value">${money(supplement)}</div></div></div><div class="result-section"><h3>Из чего складываются баллы</h3><div class="table-wrap"><table><thead><tr><th>Источник</th><th>ИПК</th></tr></thead><tbody><tr><td>Уже накоплено</td><td>${dec(current)}</td></tr><tr><td>Будущая официальная работа · ${years} лет</td><td>${dec(earned)}</td></tr><tr><td>Срочная служба</td><td>${dec(army)}</td></tr><tr><td>Уход за инвалидом I группы / человеком 80+</td><td>${dec(care)}</td></tr><tr><td>Уход за первым ребёнком</td><td>${dec(child1)}</td></tr><tr><td>Уход за вторым ребёнком</td><td>${dec(child2)}</td></tr><tr><td>Уход за третьим/четвёртым ребёнком</td><td>${dec(child34)}</td></tr><tr><td><b>Всего ИПК</b></td><td><b>${dec(total)}</b></td></tr></tbody></table></div></div><div class="result-section"><h3>Зарплата для максимума</h3><p>Ориентир модели 2026 года: <b>${maxSalary} в месяц до НДФЛ</b> или ${money(cap)} в год. При такой зарплате модель достигает 10 ИПК за год; выше предельной базы дополнительные баллы не начисляются в рамках формулы.</p></div><div class="result-section"><h3>Первые годы прогноза</h3><div class="table-wrap"><table><thead><tr><th>Год модели</th><th>Зарплата в месяц</th><th>ИПК</th></tr></thead><tbody>${annualRows||'<tr><td colspan="3">Будущие рабочие годы не заданы.</td></tr>'}</tbody></table></div></div><div class="notice">${reason}<br><br>Параметры модели: стоимость ИПК ${point} ₽, фиксированная выплата ${money(fixed)}, предельная база ${money(cap)} в год. Перед финансовыми решениями проверь актуальные значения и своё право на выплаты в Социальном фонде России.</div>`;}
  ['salary','growth','ipc','pastYears','workYears','army','care','child1','child2','child34','regionFloor'].forEach(id=>$(id).addEventListener('change',()=>{updateSalary();if(step===5)calculate()}));$('notWorking').addEventListener('change',()=>{if(step===5)calculate()});$('moscow10').addEventListener('change',()=>{if(step===5)calculate()});$('eligible').addEventListener('change',()=>{if(step===5)calculate()});updateAgeNote();updateSalary();
 })();
